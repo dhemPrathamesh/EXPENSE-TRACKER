@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Finance Tracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            background: white;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            color: #333;
+        }
+        form {
+            margin-bottom: 20px;
+        }
+        input, select, button {
+            margin: 5px 0;
+            padding: 5px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+        .summary {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        .summary div {
+            flex: 1;
+            text-align: center;
+            padding: 10px;
+            background-color: #e9e9e9;
+            border-radius: 5px;
+        }
+        #chart-container {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Personal Finance Tracker</h1>
+        
+        <form id="entry-form">
+            <input type="text" id="description" placeholder="Description" required>
+            <input type="number" id="amount" placeholder="Amount" required>
+            <select id="type">
+                <option value="income">Income</option>
+                <option value="expense">Expense</option>
+            </select>
+            <select id="category">
+                <option value="food">Food</option>
+                <option value="utilities">Utilities</option>
+                <option value="entertainment">Entertainment</option>
+                <option value="other">Other</option>
+            </select>
+            <button type="submit">Add Entry</button>
+        </form>
+
+        <h2>Entries</h2>
+        <table id="entries-table">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+
+        <div class="summary">
+            <div>
+                <h3>Total Income</h3>
+                <p id="total-income">$0</p>
+            </div>
+            <div>
+                <h3>Total Expenses</h3>
+                <p id="total-expenses">$0</p>
+            </div>
+            <div>
+                <h3>Balance</h3>
+                <p id="balance">$0</p>
+            </div>
+        </div>
+
+        <div id="chart-container">
+            <canvas id="expense-chart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        let entries = [];
+        let chart;
+
+        document.getElementById('entry-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            addEntry();
+        });
+
+        function addEntry() {
+            const description = document.getElementById('description').value;
+            const amount = parseFloat(document.getElementById('amount').value);
+            const type = document.getElementById('type').value;
+            const category = document.getElementById('category').value;
+
+            const entry = { description, amount, type, category };
+            entries.push(entry);
+
+            updateTable();
+            updateSummary();
+            updateChart();
+            resetForm();
+        }
+
+        function updateTable() {
+            const tbody = document.querySelector('#entries-table tbody');
+            tbody.innerHTML = '';
+
+            entries.forEach((entry, index) => {
+                const row = tbody.insertRow();
+                row.innerHTML = `
+                    <td>${entry.description}</td>
+                    <td>$${entry.amount.toFixed(2)}</td>
+                    <td>${entry.type}</td>
+                    <td>${entry.category}</td>
+                    <td>
+                        <button onclick="editEntry(${index})">Edit</button>
+                        <button onclick="deleteEntry(${index})">Delete</button>
+                    </td>
+                `;
+            });
+        }
+
+        function updateSummary() {
+            const totalIncome = entries
+                .filter(entry => entry.type === 'income')
+                .reduce((sum, entry) => sum + entry.amount, 0);
+
+            const totalExpenses = entries
+                .filter(entry => entry.type === 'expense')
+                .reduce((sum, entry) => sum + entry.amount, 0);
+
+            const balance = totalIncome - totalExpenses;
+
+            document.getElementById('total-income').textContent = `$${totalIncome.toFixed(2)}`;
+            document.getElementById('total-expenses').textContent = `$${totalExpenses.toFixed(2)}`;
+            document.getElementById('balance').textContent = `$${balance.toFixed(2)}`;
+        }
+
+        function updateChart() {
+            const expensesByCategory = entries
+                .filter(entry => entry.type === 'expense')
+                .reduce((acc, entry) => {
+                    acc[entry.category] = (acc[entry.category] || 0) + entry.amount;
+                    return acc;
+                }, {});
+
+            const labels = Object.keys(expensesByCategory);
+            const data = Object.values(expensesByCategory);
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            const ctx = document.getElementById('expense-chart').getContext('2d');
+            chart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            '#FF6384',
+                            '#36A2EB',
+                            '#FFCE56',
+                            '#4BC0C0'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    title: {
+                        display: true,
+                        text: 'Expenses by Category'
+                    }
+                }
+            });
+        }
+
+        function resetForm() {
+            document.getElementById('entry-form').reset();
+        }
+
+        function editEntry(index) {
+            const entry = entries[index];
+            document.getElementById('description').value = entry.description;
+            document.getElementById('amount').value = entry.amount;
+            document.getElementById('type').value = entry.type;
+            document.getElementById('category').value = entry.category;
+
+            entries.splice(index, 1);
+            updateTable();
+            updateSummary();
+            updateChart();
+        }
+
+        function deleteEntry(index) {
+            entries.splice(index, 1);
+            updateTable();
+            updateSummary();
+            updateChart();
+        }
+    </script>
+</body>
+</html>
